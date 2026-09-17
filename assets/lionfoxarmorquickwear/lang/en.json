@@ -1,0 +1,28 @@
+{
+    "tab-name": "Quick Wear",
+    "status": "Worn: {0}    In bags: {1}    Missing: {2}",
+    "hint": "Click a slot while holding armor to mount it. Click it with an empty hand to unmount. Mounted armor stays in your bags.",
+    "button-puton": "Put on",
+    "button-takeoff": "Take off",
+    "button-mountworn": "Mount worn armor",
+    "button-clear": "Clear panel",
+
+    "hotkey-toggle": "Quick Wear: put on or take off armor",
+    "hotkey-puton": "Quick Wear: put on armor",
+    "hotkey-takeoff": "Quick Wear: take off armor",
+
+    "more-in-chat": "{0} (+{1} more in chat)",
+    "problem-empty": "The Quick Wear panel is empty. Mount armor on the Quick Wear tab of the character screen.",
+    "problem-missing": "{0} isn't in your inventory",
+    "problem-blocked": "{0} can't go on: something you're wearing is in the way",
+    "problem-holdsitems": "{0} has items inside. Empty it first.",
+    "problem-stuck": "{0} can't be taken off right now",
+    "problem-noroom": "No room in your bags for {0}",
+    "problem-alreadyon": "Everything on the panel is already on",
+    "problem-nothingon": "You aren't wearing anything from the panel",
+    "problem-notarmor": "{0} isn't armor",
+    "problem-duplicate": "{0} is already on the panel",
+    "problem-full": "The Quick Wear panel is full",
+    "problem-nothingworn": "You aren't wearing any armor",
+    "problem-allmounted": "Everything you're wearing is already on the panel"
+}
