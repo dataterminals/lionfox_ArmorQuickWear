@@ -243,6 +243,7 @@ namespace lionfox_ArmorQuickWear
 
         ItemStack? TakeOff(IServerPlayer player, Loadout loadout, ResultPacket result, bool fromToggle)
         {
+            var character = player.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName);
             ItemStack? firstMoved = null;
             bool anythingOn = false;
 
@@ -263,7 +264,7 @@ namespace lionfox_ArmorQuickWear
                     continue;
                 }
 
-                ItemSlot? target = FindReturnSlot(player, loadout.Cells[cell]!, worn);
+                ItemSlot? target = FindReturnSlot(player, loadout.Cells[cell]!, worn, character);
                 if (target == null || !target.TryFlipWith(worn))
                 {
                     AddProblem(result, cell, "noroom");
@@ -297,9 +298,9 @@ namespace lionfox_ArmorQuickWear
             return ArmorRules.SlotsOf(character).FirstOrDefault(slot => ArmorRules.IsArmorSlot(slot) && slot.Empty && slot.CanHold(source));
         }
 
-        // Back where the piece came from if that spot is still free, otherwise anywhere in the
-        // backpack. Never the ground: if nothing fits, the piece stays on.
-        static ItemSlot? FindReturnSlot(IServerPlayer player, LoadoutEntry entry, ItemSlot worn)
+        // Back where the piece came from if that spot is still free, otherwise the end of the
+        // backpack. Never the ground: if the backpack is completely full, the piece stays on.
+        static ItemSlot? FindReturnSlot(IServerPlayer player, LoadoutEntry entry, ItemSlot worn, IInventory? character)
         {
             var backpack = player.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
             var hotbar = player.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
@@ -316,7 +317,47 @@ namespace lionfox_ArmorQuickWear
                 return returnSlot;
             }
 
-            return ArmorRules.SlotsOf(backpack).FirstOrDefault(slot => Fits(slot, worn));
+            var carried = ArmorRules.SlotsOf(backpack).Where(ArmorRules.IsCarrySlot).ToList();
+            return ClaimEndSlot(carried, worn, character);
+        }
+
+        // Taken-off armor collects at the end of the backpack. Walk back from the last slot to the
+        // first one that could hold the piece and isn't already holding armor; if something else
+        // sits there, nudge it aside. The check is stateless (what's in the slot, not what this
+        // take-off placed), so it stays right even if CO rebuilds the backpack's slots mid-way.
+        static ItemSlot? ClaimEndSlot(List<ItemSlot> slots, ItemSlot worn, IInventory? character)
+        {
+            for (int i = slots.Count - 1; i >= 0; i--)
+            {
+                var slot = slots[i];
+                if (!slot.CanHold(worn)) continue;
+                if (slot.Empty) return slot;
+                if (slot.Itemstack is { } occupant && ArmorRules.IsArmorPiece(occupant, character)) continue;
+                if (TryNudge(slots, i)) return slot;
+            }
+            return null;
+        }
+
+        // Moves whatever is in slots[index] to the nearest free slot that takes it, preferring the
+        // front on a tie. Fails only when no free slot anywhere can hold it.
+        static bool TryNudge(List<ItemSlot> slots, int index)
+        {
+            var occupant = slots[index];
+            if (!occupant.CanTake()) return false;
+
+            for (int distance = 1; distance < slots.Count; distance++)
+            {
+                foreach (int j in new[] { index - distance, index + distance })
+                {
+                    if (j < 0 || j >= slots.Count || !slots[j].Empty || !slots[j].CanHold(occupant)) continue;
+                    if (!slots[j].TryFlipWith(occupant)) continue;
+
+                    slots[j].MarkDirty();
+                    occupant.MarkDirty();
+                    return true;
+                }
+            }
+            return false;
         }
 
         static bool Fits(ItemSlot slot, ItemSlot worn)

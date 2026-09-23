@@ -4,7 +4,7 @@
     "name": "ArmorQuickWear",
     "description": "AQW: mount your armor on the Quick Wear tab of the character screen, then put all of it on or take all of it off with one hotkey. Mounted armor stays in your bags or on your body; the tab only remembers it. Works with Combat Overhaul's layered armor. Hotkeys are unbound by default (ESC > Controls).",
     "authors": [ "lionfox" ],
-    "version": "1.0.0",
+    "version": "1.1.0",
     "side": "Universal",
     "requiredOnClient": true,
     "requiredOnServer": true,
