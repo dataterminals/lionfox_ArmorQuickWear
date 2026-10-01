@@ -264,7 +264,7 @@ namespace lionfox_ArmorQuickWear
                     continue;
                 }
 
-                ItemSlot? target = FindReturnSlot(player, loadout.Cells[cell]!, worn, character);
+                ItemSlot? target = FindReturnSlot(player, worn, character);
                 if (target == null || !target.TryFlipWith(worn))
                 {
                     AddProblem(result, cell, "noroom");
@@ -298,25 +298,16 @@ namespace lionfox_ArmorQuickWear
             return ArmorRules.SlotsOf(character).FirstOrDefault(slot => ArmorRules.IsArmorSlot(slot) && slot.Empty && slot.CanHold(source));
         }
 
-        // Back where the piece came from if that spot is still free, otherwise the end of the
-        // backpack. Never the ground: if the backpack is completely full, the piece stays on.
-        static ItemSlot? FindReturnSlot(IServerPlayer player, LoadoutEntry entry, ItemSlot worn, IInventory? character)
+        // Always the end of the backpack. Never the ground: if the backpack is completely full,
+        // the piece stays on.
+        //
+        // 1.1.0 first tried the slot the piece was put on from. That spot is always free again by
+        // the time the piece comes off (the piece left it), so armor picked up into the front
+        // slots went straight back to the front every time and never reached the end (Gwen,
+        // 2026-10-01). The remembered slot is still saved with the loadout, just not used.
+        static ItemSlot? FindReturnSlot(IServerPlayer player, ItemSlot worn, IInventory? character)
         {
             var backpack = player.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName);
-            var hotbar = player.InventoryManager.GetOwnInventory(GlobalConstants.hotBarInvClassName);
-
-            IInventory? origin = null;
-            if (entry.ReturnInventoryId != null)
-            {
-                if (entry.ReturnInventoryId == backpack?.InventoryID) origin = backpack;
-                else if (entry.ReturnInventoryId == hotbar?.InventoryID) origin = hotbar;
-            }
-            if (origin != null && entry.ReturnSlotId >= 0 && entry.ReturnSlotId < origin.Count
-                && origin[entry.ReturnSlotId] is { } returnSlot && Fits(returnSlot, worn))
-            {
-                return returnSlot;
-            }
-
             var carried = ArmorRules.SlotsOf(backpack).Where(ArmorRules.IsCarrySlot).ToList();
             return ClaimEndSlot(carried, worn, character);
         }
@@ -358,11 +349,6 @@ namespace lionfox_ArmorQuickWear
                 }
             }
             return false;
-        }
-
-        static bool Fits(ItemSlot slot, ItemSlot worn)
-        {
-            return ArmorRules.IsCarrySlot(slot) && slot.Empty && slot.CanHold(worn);
         }
 
         // The piece's own footstep sound (plate, chain, leather...), heard by everyone nearby.
