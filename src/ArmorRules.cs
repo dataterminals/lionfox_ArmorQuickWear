@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Util;
 
 namespace lionfox_ArmorQuickWear
 {
@@ -80,9 +81,27 @@ namespace lionfox_ArmorQuickWear
             return !bag.IsEmpty(stack);
         }
 
+        // A piece that changes item when it changes state is still the same piece: lionfox Cloaked's hood and hooded helm
+        // are hood-up / -half / -down (Sylvia, 2026-11-07: a mounted hood went unfound once it was raised). Their codes
+        // are compared with the "state" variant left out.
         public static bool SameKind(ItemStack a, ItemStack b)
         {
-            return a.Class == b.Class && a.Id == b.Id;
+            if (a.Class != b.Class) return false;
+            if (a.Id == b.Id) return true;
+            CollectibleObject? ca = a.Collectible, cb = b.Collectible;
+            return ca?.Variant?["state"] != null && cb?.Variant?["state"] != null
+                && ca.CodeWithVariant("state", "*").Equals(cb.CodeWithVariant("state", "*"));
+        }
+
+        // Worn pieces that make way for a mounted piece their slot would refuse: lionfox Cloaked's standalone hood
+        // (hood-up / -half / -down) takes the head slot from every helmet, so putting on a mounted helmet took the hood off
+        // first instead of skipping the helmet (Sylvia, 2026-11-07). Matched by code: this mod references no other.
+        static readonly AssetLocation[] GivesWay = { new("lionfoxcloaked", "hood-*") };
+
+        public static bool GivesWayTo(ItemStack? worn)
+        {
+            AssetLocation? code = worn?.Collectible?.Code;
+            return code != null && GivesWay.Any(w => WildcardUtil.Match(w, code));
         }
 
         // A bag slot holds a worn bag, not carried gear, so it is never a source or a destination.

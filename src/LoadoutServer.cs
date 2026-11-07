@@ -222,6 +222,7 @@ namespace lionfox_ArmorQuickWear
                 // The same move CO's own right-click equip makes: flip into the first armor slot
                 // that accepts the piece. A piece already worn in the way makes CanHold say no.
                 ItemSlot? target = FirstFreeArmorSlotFor(character, source);
+                if (target == null) target = MakeWay(player, character, source, status);
                 if (target == null || !target.TryFlipWith(source))
                 {
                     AddProblem(result, cell, "blocked");
@@ -296,6 +297,30 @@ namespace lionfox_ArmorQuickWear
         static ItemSlot? FirstFreeArmorSlotFor(IInventory? character, ItemSlot source)
         {
             return ArmorRules.SlotsOf(character).FirstOrDefault(slot => ArmorRules.IsArmorSlot(slot) && slot.Empty && slot.CanHold(source));
+        }
+
+        // When nothing takes the piece, a worn piece that gives way (ArmorRules.GivesWayTo: Cloaked's standalone hood)
+        // and isn't itself mounted goes to the end of the backpack the way taking off does, and the piece gets its slot.
+        // If the piece still doesn't fit, it goes back on where it was, so a put-on never leaves it off for nothing.
+        ItemSlot? MakeWay(IServerPlayer player, IInventory? character, ItemSlot source, ArmorRules.Status status)
+        {
+            var mounted = new HashSet<ItemSlot>(status.Worn.Values);
+            foreach (var worn in ArmorRules.SlotsOf(character).Where(slot => ArmorRules.IsArmorSlot(slot) && !slot.Empty).ToList())
+            {
+                if (mounted.Contains(worn) || !ArmorRules.GivesWayTo(worn.Itemstack) || !worn.CanTake() || ArmorRules.HoldsItems(worn.Itemstack)) continue;
+                ItemSlot? bag = FindReturnSlot(player, worn, character);
+                if (bag == null || !bag.TryFlipWith(worn)) continue;
+                bag.MarkDirty();
+                worn.MarkDirty();
+                ItemSlot? target = FirstFreeArmorSlotFor(character, source);
+                if (target != null) return target;
+                if (worn.TryFlipWith(bag))
+                {
+                    worn.MarkDirty();
+                    bag.MarkDirty();
+                }
+            }
+            return null;
         }
 
         // Always the end of the backpack. Never the ground: if the backpack is completely full,

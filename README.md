@@ -5,7 +5,7 @@ Mount your armor on a panel in the character screen, then put all of it on or ta
 | | |
 |---|---|
 | modid | `lionfoxarmorquickwear` |
-| version | 1.1.0 |
+| version | 1.1.2 |
 | game dependency | 1.22.6 |
 | type | code (C#), universal: install on the server, clients get it automatically |
 
@@ -23,7 +23,8 @@ Mount your armor on a panel in the character screen, then put all of it on or ta
 
 - The panel is not an inventory. It keeps a copy of each piece's kind and look. The real items stay in your bags or on your body, and AQW never changes them.
 - Any piece of the same kind can stand in for a mounted one. A piece with the exact look (such as the same color) is picked first, then the one with the most durability left.
-- **Putting on:** pieces come out of the backpack or hotbar and go into the first armor slot that accepts them. If armor you're already wearing is in the way, that piece is skipped and you get a message.
+- **Putting on:** pieces come out of the backpack or hotbar and go into the first armor slot that accepts them. If armor you're already wearing is in the way, that piece is skipped and you get a message. The one exception is a lionfox Cloaked hood worn without a helmet: if it isn't on the panel itself, it goes to the end of the backpack and the helmet goes on (1.1.2). If the helmet still wouldn't fit, the hood goes back on.
+- A Cloaked hood or hooded helm is the same piece raised, half back or down: the panel finds it in whichever state it's in (1.1.2).
 - **Taking off:** each piece goes to the end of the backpack: the last slot that can hold armor and isn't already holding armor. If something else is sitting there, that item gets nudged to the nearest free slot first. More pieces fill backward from the end, so armor collects in your last slots. (1.1.0 first tried the slot the piece was put on from; that slot is always free again by then, so armor kept going back to the front. 1.1.1 dropped it.) If the backpack is completely full, the piece stays on. Nothing is ever dropped on the ground.
 - A piece with items inside is never moved, because Combat Overhaul would spill them on the ground.
 - The server makes every move with the same slot rules a manual drag uses, so Combat Overhaul's layer and zone checks still apply. AQW never references Combat Overhaul's assembly, so a CO update can't break it.
