@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 
 namespace lionfox_ArmorQuickWear
@@ -10,6 +11,9 @@ namespace lionfox_ArmorQuickWear
     public class LoadoutServer
     {
         const string ModdataKey = "lionfoxarmorquickwear-loadout";
+        // What a put-on moved aside to make way (MakeWay), so the next take-off puts it back on (1.2.0). In the player's
+        // moddata like the loadout, so it survives a restart between the two.
+        const string SetAsideKey = "lionfoxarmorquickwear-setaside";
         // Keeps a double-tapped key from flipping the armor straight back before the first
         // result has even reached the client.
         const long MoveCooldownMs = 300;
@@ -222,9 +226,12 @@ namespace lionfox_ArmorQuickWear
                 // The same move CO's own right-click equip makes: flip into the first armor slot
                 // that accepts the piece. A piece already worn in the way makes CanHold say no.
                 ItemSlot? target = FirstFreeArmorSlotFor(character, source);
-                if (target == null) target = MakeWay(player, character, source, status);
+                ItemStack? setAside = null;
+                if (target == null) target = MakeWay(player, character, source, status, out setAside);
                 if (target == null || !target.TryFlipWith(source))
                 {
+                    // the piece that made way goes straight back on: a put-on never leaves it off for nothing
+                    if (setAside != null) RestoreSetAside(player, character, new ResultPacket());
                     AddProblem(result, cell, "blocked");
                     continue;
                 }
@@ -278,7 +285,12 @@ namespace lionfox_ArmorQuickWear
                 firstMoved ??= target.Itemstack;
             }
 
-            if (!anythingOn)
+            // what the put-on moved aside goes back on, now its slot is free again (1.2.0)
+            int before = result.Moved;
+            ItemStack? restored = RestoreSetAside(player, character, result);
+            firstMoved ??= restored;
+
+            if (!anythingOn && result.Moved == before)
             {
                 // A toggle only lands here when nothing mounted is carried either, so every piece
                 // is missing and naming them is more useful than "nothing to take off".
@@ -299,21 +311,32 @@ namespace lionfox_ArmorQuickWear
             return ArmorRules.SlotsOf(character).FirstOrDefault(slot => ArmorRules.IsArmorSlot(slot) && slot.Empty && slot.CanHold(source));
         }
 
-        // When nothing takes the piece, a worn piece that gives way (ArmorRules.GivesWayTo: Cloaked's standalone hood)
-        // and isn't itself mounted goes to the end of the backpack the way taking off does, and the piece gets its slot.
-        // If the piece still doesn't fit, it goes back on where it was, so a put-on never leaves it off for nothing.
-        ItemSlot? MakeWay(IServerPlayer player, IInventory? character, ItemSlot source, ArmorRules.Status status)
+        // When nothing takes the piece, a worn piece that gives way (ArmorRules.GivesWayTo: Cloaked's standalone hood, or
+        // a helmet when the piece is that hood) and isn't itself mounted goes to the end of the backpack the way taking
+        // off does, and the piece gets its slot. The piece that made way is remembered (setAside) so the next take-off
+        // puts it back on. If the piece still doesn't fit, it goes back on where it was, so a put-on never leaves it off
+        // for nothing.
+        ItemSlot? MakeWay(IServerPlayer player, IInventory? character, ItemSlot source, ArmorRules.Status status, out ItemStack? setAside)
         {
+            setAside = null;
             var mounted = new HashSet<ItemSlot>(status.Worn.Values);
             foreach (var worn in ArmorRules.SlotsOf(character).Where(slot => ArmorRules.IsArmorSlot(slot) && !slot.Empty).ToList())
             {
-                if (mounted.Contains(worn) || !ArmorRules.GivesWayTo(worn.Itemstack) || !worn.CanTake() || ArmorRules.HoldsItems(worn.Itemstack)) continue;
+                if (mounted.Contains(worn) || !ArmorRules.GivesWayTo(worn.Itemstack, source.Itemstack) || !worn.CanTake() || ArmorRules.HoldsItems(worn.Itemstack)) continue;
+                ItemStack moving = TemplateOf(worn.Itemstack!);
                 ItemSlot? bag = FindReturnSlot(player, worn, character);
                 if (bag == null || !bag.TryFlipWith(worn)) continue;
                 bag.MarkDirty();
                 worn.MarkDirty();
                 ItemSlot? target = FirstFreeArmorSlotFor(character, source);
-                if (target != null) return target;
+                if (target != null)
+                {
+                    var list = GetSetAside(player);
+                    list.Add(moving);
+                    SaveSetAside(player, list);
+                    setAside = moving;
+                    return target;
+                }
                 if (worn.TryFlipWith(bag))
                 {
                     worn.MarkDirty();
@@ -321,6 +344,76 @@ namespace lionfox_ArmorQuickWear
                 }
             }
             return null;
+        }
+
+        // ---------- what made way, back on (1.2.0) ----------
+
+        // Sylvia, 2026-11-12: "when you put the hood on standalone and then do the quickwear, when you take it back off it
+        // doesnt put the hood back on". Each piece a put-on moved aside goes back on from the bags (its exact look first,
+        // then any of its kind), into the first armor slot that takes it. A piece no longer in the bags is forgotten; one
+        // whose slot is taken again stays in the bags, with a message. Either way the record is cleared: it is one
+        // put-on's undo, not a standing rule.
+        ItemStack? RestoreSetAside(IServerPlayer player, IInventory? character, ResultPacket result)
+        {
+            var list = GetSetAside(player);
+            if (list.Count == 0) return null;
+            string[] ignored = ArmorRules.LookIgnoredAttributes();
+            ItemStack? first = null;
+            foreach (ItemStack template in list)
+            {
+                ItemSlot? source = ArmorRules.CarriedSlots(player)
+                    .Where(slot => slot.Itemstack is { } s && ArmorRules.SameKind(s, template))
+                    .OrderByDescending(slot => slot.Itemstack!.Equals(sapi.World, template, ignored))
+                    .FirstOrDefault();
+                if (source == null || ArmorRules.HoldsItems(source.Itemstack)) continue;
+                ItemSlot? target = FirstFreeArmorSlotFor(character, source);
+                if (target == null || !target.TryFlipWith(source))
+                {
+                    AddProblem(result, -1, "restoreblocked");
+                    continue;
+                }
+                target.MarkDirty();
+                source.MarkDirty();
+                result.Moved++;
+                first ??= target.Itemstack;
+            }
+            SaveSetAside(player, new List<ItemStack>());
+            return first;
+        }
+
+        List<ItemStack> GetSetAside(IServerPlayer player)
+        {
+            var list = new List<ItemStack>();
+            byte[]? data = player.WorldData.GetModdata(SetAsideKey);
+            if (data == null || data.Length == 0) return list;
+            try
+            {
+                var tree = TreeAttribute.CreateFromBytes(data);
+                int n = tree.GetInt("n");
+                for (int i = 0; i < n; i++)
+                {
+                    ItemStack? stack = tree.GetItemstack("s" + i);
+                    if (stack != null && stack.ResolveBlockOrItem(sapi.World)) list.Add(stack);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warning("Could not read what Quick Wear set aside for {0}, forgetting it: {1}", player.PlayerName, e.Message);
+            }
+            return list;
+        }
+
+        void SaveSetAside(IServerPlayer player, List<ItemStack> list)
+        {
+            if (list.Count == 0)
+            {
+                player.WorldData.RemoveModdata(SetAsideKey);
+                return;
+            }
+            var tree = new TreeAttribute();
+            tree.SetInt("n", list.Count);
+            for (int i = 0; i < list.Count; i++) tree.SetItemstack("s" + i, list[i]);
+            player.WorldData.SetModdata(SetAsideKey, tree.ToBytes());
         }
 
         // Always the end of the backpack. Never the ground: if the backpack is completely full,

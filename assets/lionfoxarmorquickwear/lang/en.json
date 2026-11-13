@@ -24,5 +24,6 @@
     "problem-duplicate": "{0} is already on the panel",
     "problem-full": "The Quick Wear panel is full",
     "problem-nothingworn": "You aren't wearing any armor",
-    "problem-allmounted": "Everything you're wearing is already on the panel"
+    "problem-allmounted": "Everything you're wearing is already on the panel",
+    "problem-restoreblocked": "What Quick Wear moved aside to make way couldn't go back on: something you're wearing is in the way. It's in your bags."
 }

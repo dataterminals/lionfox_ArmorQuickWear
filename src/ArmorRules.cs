@@ -98,10 +98,27 @@ namespace lionfox_ArmorQuickWear
         // first instead of skipping the helmet (Sylvia, 2026-11-07). Matched by code: this mod references no other.
         static readonly AssetLocation[] GivesWay = { new("lionfoxcloaked", "hood-*") };
 
-        public static bool GivesWayTo(ItemStack? worn)
+        public static bool IsHood(ItemStack? stack)
         {
-            AssetLocation? code = worn?.Collectible?.Code;
+            AssetLocation? code = stack?.Collectible?.Code;
             return code != null && GivesWay.Any(w => WildcardUtil.Match(w, code));
+        }
+
+        // Both ways since 1.2.0 (Sylvia, 2026-11-12): a worn hood makes way for a mounted helmet, and a worn helmet for a
+        // mounted hood. Whatever made way goes back on at the next take-off (LoadoutServer's set-aside). MakeWay still
+        // puts a piece straight back if moving it didn't free the slot, so a piece that wasn't in the way stays on.
+        public static bool GivesWayTo(ItemStack? worn, ItemStack? incoming)
+        {
+            return IsHood(worn) || (IsHood(incoming) && IsHeadPiece(worn));
+        }
+
+        // A helmet, by its code (armor-head-*, platehead-*, el-...-head-...): this mod references neither CO nor Cloaked,
+        // and only head pieces can stand in a hood's way. Trying the others would flip them into the bags and back for
+        // nothing (MakeWay's undo), nudging bag items aside on the way.
+        static bool IsHeadPiece(ItemStack? stack)
+        {
+            string? path = stack?.Collectible?.Code?.Path;
+            return path != null && path.Contains("head", System.StringComparison.Ordinal);
         }
 
         // A bag slot holds a worn bag, not carried gear, so it is never a source or a destination.
