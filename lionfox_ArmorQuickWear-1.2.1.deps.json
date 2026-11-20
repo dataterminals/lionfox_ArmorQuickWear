@@ -6,15 +6,15 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "lionfox_ArmorQuickWear-1.2.0/1.2.0": {
+      "lionfox_ArmorQuickWear-1.2.1/1.2.1": {
         "runtime": {
-          "lionfox_ArmorQuickWear-1.2.0.dll": {}
+          "lionfox_ArmorQuickWear-1.2.1.dll": {}
         }
       }
     }
   },
   "libraries": {
-    "lionfox_ArmorQuickWear-1.2.0/1.2.0": {
+    "lionfox_ArmorQuickWear-1.2.1/1.2.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

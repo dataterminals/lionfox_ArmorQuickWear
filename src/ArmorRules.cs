@@ -65,6 +65,9 @@ namespace lionfox_ArmorQuickWear
         // whether one of this character's armor slots would take it.
         public static bool IsArmorPiece(ItemStack stack, IInventory? character)
         {
+            // Cloaked's hood and hooded helm are armour whatever the moment says: their IsArmorType is false (so vanilla
+            // warmth counts them), and while a hood is worn no armour slot would take a hooded helm (1.2.1)
+            if (IsCloakedPiece(stack)) return true;
             var probe = new DummySlot(stack);
             if (stack.Collectible?.GetCollectibleInterface<IWearableStatsSupplier>()?.IsArmorType(probe) == true)
             {
@@ -97,6 +100,14 @@ namespace lionfox_ArmorQuickWear
         // (hood-up / -half / -down) takes the head slot from every helmet, so putting on a mounted helmet took the hood off
         // first instead of skipping the helmet (Sylvia, 2026-11-07). Matched by code: this mod references no other.
         static readonly AssetLocation[] GivesWay = { new("lionfoxcloaked", "hood-*") };
+
+        static readonly AssetLocation[] CloakedPieces = { new("lionfoxcloaked", "hood-*"), new("lionfoxcloaked", "hoodedhelm-*") };
+
+        public static bool IsCloakedPiece(ItemStack? stack)
+        {
+            AssetLocation? code = stack?.Collectible?.Code;
+            return code != null && CloakedPieces.Any(w => WildcardUtil.Match(w, code));
+        }
 
         public static bool IsHood(ItemStack? stack)
         {
